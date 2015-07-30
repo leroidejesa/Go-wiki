@@ -6,6 +6,9 @@ import (
   "html/template"
 )
 
+//template caching
+var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
+
 // body element is []byte rather than string because that is the type expected by io libraries
 type Page struct {
   Title string
@@ -27,8 +30,10 @@ func loadPage(title string) (*Page, error) {
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-  t, _ := template.ParseFiles(tmpl + ".html")
-  t.Execute(w, p)
+    err := templates.ExecuteTemplate(w, tmpl+".html", p)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
@@ -51,11 +56,15 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-  title := r.URL.Path[len("/save/"):]
-  body := r.FormValue("body")
-  p := &Page{Title: title, Body: []byte(body)}
-  p.save()
-  http.Redirect(w, r, "/view/"+title, http.StatusFound)
+    title := r.URL.Path[len("/save/"):]
+    body := r.FormValue("body")
+    p := &Page{Title: title, Body: []byte(body)}
+    err := p.save()
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 
 func main() {
